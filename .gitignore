@@ -3,7 +3,6 @@
 bin/*
 !bin/assets
 build/
-lib/
 vs*/
 
 # MacOS Cache

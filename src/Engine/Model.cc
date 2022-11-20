@@ -1,0 +1,410 @@
+#include <Engine/Model.hh>
+#include <Engine/ResourceManager.hh>
+#include <Engine/SDLppRenderer.hh>
+#include <Engine/SDLppTexture.hh>
+#include <Engine/Transform.hh>
+#include <cassert>
+#include <fmt/color.h>
+#include <fmt/core.h>
+#include <fmt/std.h>
+#include <fstream>
+#include <lz4.h>
+#include <nlohmann/json.hpp>
+
+constexpr unsigned int FileVersion = 1;
+
+Model::Model(std::shared_ptr<const SDLppTexture> texture,
+             std::vector<ModelVertex> vertices,
+             std::vector<int> indices)
+  : m_texture(std::move(texture))
+  , m_vertices(std::move(vertices))
+  , m_indices(std::move(indices))
+{
+  m_sdlVertices.resize(m_vertices.size());
+  for (std::size_t i = 0; i < m_vertices.size(); ++i) {
+    const ModelVertex& modelVertex = m_vertices[i];
+    SDL_Vertex& sdlVertex = m_sdlVertices[i];
+    sdlVertex.tex_coord = SDL_FPoint{ modelVertex.uv.x, modelVertex.uv.y };
+
+    Uint8 r, g, b, a;
+    modelVertex.color.ToRGBA8(r, g, b, a);
+
+    sdlVertex.color = SDL_Color{ r, g, b, a };
+  }
+}
+
+void
+Model::Draw(SDLppRenderer& renderer, const Matrix3f& matrix)
+{
+  assert(m_vertices.size() == m_sdlVertices.size());
+  for (std::size_t i = 0; i < m_vertices.size(); ++i) {
+    const ModelVertex& modelVertex = m_vertices[i];
+    SDL_Vertex& sdlVertex = m_sdlVertices[i];
+    Vector2f transformedPos = matrix * modelVertex.pos;
+    sdlVertex.position = SDL_FPoint{ transformedPos.x, transformedPos.y };
+  }
+
+  if (!m_indices.empty()) {
+    SDL_RenderGeometry(renderer.GetHandle(),
+                       (m_texture) ? m_texture->GetHandle() : nullptr,
+                       m_sdlVertices.data(),
+                       static_cast<int>(m_sdlVertices.size()),
+                       m_indices.data(),
+                       static_cast<int>(m_indices.size()));
+  } else {
+    SDL_RenderGeometry(renderer.GetHandle(),
+                       (m_texture) ? m_texture->GetHandle() : nullptr,
+                       m_sdlVertices.data(),
+                       static_cast<int>(m_sdlVertices.size()),
+                       nullptr,
+                       0);
+  }
+}
+
+const std::vector<ModelVertex>&
+Model::GetVertices() const
+{
+  return m_vertices;
+}
+
+bool
+Model::IsValid() const
+{
+  return !m_vertices.empty();
+}
+
+bool
+Model::SaveToFile(const std::filesystem::path& filepath) const
+{
+  if (filepath.extension() == ".model")
+    return SaveToFileRegular(filepath);
+  else if (filepath.extension() == ".cmodel")
+    return SaveToFileCompressed(filepath);
+  else if (filepath.extension() == ".bmodel")
+    return SaveToFileBinary(filepath);
+  else {
+    fmt::print(stderr,
+               fg(fmt::color::red),
+               "unknown extension {}\n",
+               filepath.extension());
+    return false;
+  }
+}
+
+nlohmann::ordered_json
+Model::SaveToJSon() const
+{
+  nlohmann::ordered_json doc;
+  doc["version"] = FileVersion;
+  if (m_texture) {
+    const std::string& texturePath = m_texture->GetFilepath();
+    if (!texturePath.empty())
+      doc["texture"] = texturePath;
+  }
+  if (!m_indices.empty()) {
+    nlohmann::ordered_json& indices = doc["indices"];
+    for (int i : m_indices)
+      indices.push_back(i);
+  }
+
+  nlohmann::ordered_json& vertices = doc["vertices"];
+  for (const ModelVertex& modelVertex : m_vertices) {
+    nlohmann::ordered_json& vertex = vertices.emplace_back();
+
+    nlohmann::ordered_json& pos = vertex["pos"];
+    pos["x"] = modelVertex.pos.x;
+    pos["y"] = modelVertex.pos.y;
+
+    nlohmann::ordered_json& uv = vertex["uv"];
+    uv["u"] = modelVertex.uv.x;
+    uv["v"] = modelVertex.uv.y;
+
+    nlohmann::ordered_json& color = vertex["color"];
+    color["r"] = modelVertex.color.r;
+    color["g"] = modelVertex.color.g;
+    color["b"] = modelVertex.color.b;
+    if (modelVertex.color.a != 1.f)
+      color["a"] = modelVertex.color.a;
+  }
+
+  return doc;
+}
+
+Model
+Model::LoadFromFile(const std::filesystem::path& filepath)
+{
+  if (filepath.extension() == ".model")
+    return LoadFromFileRegular(filepath);
+  else if (filepath.extension() == ".cmodel")
+    return LoadFromFileCompressed(filepath);
+  else if (filepath.extension() == ".bmodel")
+    return LoadFromFileBinary(filepath);
+  else {
+    fmt::print(stderr,
+               fg(fmt::color::red),
+               "unknown extension {}\n",
+               filepath.extension());
+    return {};
+  }
+}
+
+Model
+Model::LoadFromJSon(const nlohmann::json& doc)
+{
+  unsigned int version = doc["version"];
+  if (version > FileVersion) {
+    fmt::print(stderr,
+               fg(fmt::color::red),
+               "model file has unsupported version {} (current version is {})",
+               version,
+               FileVersion);
+    return {};
+  }
+
+  std::string texturePath = doc.value("texture", "");
+  std::shared_ptr<const SDLppTexture> texture;
+  if (!texturePath.empty())
+    texture = ResourceManager::Instance().GetTexture(texturePath);
+  std::vector<int> indices;
+  if (auto it = doc.find("indices"); it != doc.end()) {
+    const nlohmann::json& indiceArray = it.value();
+    for (int i : indiceArray)
+      indices.push_back(i);
+  }
+  const nlohmann::json& verticeArray = doc["vertices"];
+
+  std::vector<ModelVertex> vertices;
+  for (const nlohmann::json& vertex : verticeArray) {
+    ModelVertex& modelVertex = vertices.emplace_back();
+
+    const nlohmann::json& positionDoc = vertex["pos"];
+    modelVertex.pos = Vector2f(positionDoc["x"], positionDoc["y"]);
+
+    if (auto it = vertex.find("uv"); it != vertex.end()) {
+      const nlohmann::json& uvDoc = it.value();
+      modelVertex.uv = Vector2f(uvDoc["u"], uvDoc["v"]);
+    }
+
+    if (auto it = vertex.find("color"); it != vertex.end()) {
+      const nlohmann::json& colorDoc = it.value();
+      modelVertex.color = Color(
+        colorDoc["r"], colorDoc["g"], colorDoc["b"], colorDoc.value("a", 1.f));
+    }
+  }
+
+  return Model(std::move(texture), std::move(vertices), std::move(indices));
+}
+
+bool
+Model::SaveToFileRegular(const std::filesystem::path& filepath) const
+{
+  std::ofstream outputFile(filepath);
+  if (!outputFile.is_open()) {
+    fmt::print(
+      stderr, fg(fmt::color::red), "failed to open model file {}\n", filepath);
+    return false;
+  }
+
+  nlohmann::ordered_json doc = SaveToJSon();
+  outputFile << doc.dump(4);
+  return true;
+}
+
+bool
+Model::SaveToFileCompressed(const std::filesystem::path& filepath) const
+{
+  std::ofstream outputFile(filepath, std::ios::binary);
+  if (!outputFile.is_open()) {
+    fmt::print(
+      stderr, fg(fmt::color::red), "failed to open model file {}\n", filepath);
+    return false;
+  }
+
+  nlohmann::ordered_json doc = SaveToJSon();
+
+  std::string jsonStr = doc.dump();
+  int maxSize = LZ4_compressBound(static_cast<int>(jsonStr.size()));
+  Uint32 decompressedSize = static_cast<Uint32>(jsonStr.size());
+  outputFile.write(reinterpret_cast<const char*>(&decompressedSize),
+                   sizeof(Uint32));
+  std::unique_ptr<char[]> compressedStr = std::make_unique<char[]>(maxSize);
+  int finalSize = LZ4_compress_default(jsonStr.data(),
+                                       compressedStr.get(),
+                                       static_cast<int>(jsonStr.size()),
+                                       static_cast<int>(maxSize));
+  if (finalSize == 0) {
+    fmt::print(stderr, fg(fmt::color::red), "failed to compress model file\n");
+    return false;
+  }
+  outputFile.write(compressedStr.get(), finalSize);
+
+  return true;
+}
+
+bool
+Model::SaveToFileBinary(const std::filesystem::path& filepath) const
+{
+  std::ofstream outputFile(filepath, std::ios::binary);
+  if (!outputFile.is_open()) {
+    fmt::print(
+      stderr, fg(fmt::color::red), "failed to open model file {}\n", filepath);
+    return false;
+  }
+  Uint8 version = FileVersion;
+  outputFile.write(reinterpret_cast<const char*>(&version), sizeof(Uint8));
+  if (m_texture) {
+    const std::string& texturePath = m_texture->GetFilepath();
+
+    Uint32 pathLength = static_cast<Uint32>(texturePath.size());
+    outputFile.write(reinterpret_cast<const char*>(&pathLength),
+                     sizeof(Uint32));
+    outputFile.write(reinterpret_cast<const char*>(&texturePath[0]),
+                     pathLength);
+  } else {
+    Uint32 pathLength = 0;
+    outputFile.write(reinterpret_cast<const char*>(&pathLength),
+                     sizeof(Uint32));
+  }
+  Uint32 indexCount = static_cast<Uint32>(m_indices.size());
+  outputFile.write(reinterpret_cast<const char*>(&indexCount), sizeof(Uint32));
+
+  for (int index : m_indices) {
+    Sint32 value = static_cast<Sint32>(index);
+    outputFile.write(reinterpret_cast<const char*>(&value), sizeof(Sint32));
+  }
+  Uint32 vertexCount = static_cast<Uint32>(m_vertices.size());
+  outputFile.write(reinterpret_cast<const char*>(&vertexCount), sizeof(Uint32));
+
+  for (const auto& vertex : m_vertices) {
+    outputFile.write(reinterpret_cast<const char*>(&vertex.pos.x),
+                     sizeof(float));
+    outputFile.write(reinterpret_cast<const char*>(&vertex.pos.y),
+                     sizeof(float));
+    outputFile.write(reinterpret_cast<const char*>(&vertex.uv.x),
+                     sizeof(float));
+    outputFile.write(reinterpret_cast<const char*>(&vertex.uv.y),
+                     sizeof(float));
+    outputFile.write(reinterpret_cast<const char*>(&vertex.color.r),
+                     sizeof(float));
+    outputFile.write(reinterpret_cast<const char*>(&vertex.color.g),
+                     sizeof(float));
+    outputFile.write(reinterpret_cast<const char*>(&vertex.color.b),
+                     sizeof(float));
+    outputFile.write(reinterpret_cast<const char*>(&vertex.color.a),
+                     sizeof(float));
+  }
+
+  return true;
+}
+
+Model
+Model::LoadFromFileRegular(const std::filesystem::path& filepath)
+{
+  std::ifstream inputFile(filepath);
+  if (!inputFile.is_open()) {
+    fmt::print(
+      stderr, fg(fmt::color::red), "failed to open model file {}\n", filepath);
+    return {};
+  }
+
+  return LoadFromJSon(nlohmann::json::parse(inputFile));
+}
+
+Model
+Model::LoadFromFileCompressed(const std::filesystem::path& filepath)
+{
+  std::ifstream inputFile(filepath, std::ios::binary);
+  if (!inputFile.is_open()) {
+    fmt::print(
+      stderr, fg(fmt::color::red), "failed to open model file {}\n", filepath);
+    return {};
+  }
+  std::vector<char> content((std::istreambuf_iterator<char>(inputFile)),
+                            std::istreambuf_iterator<char>());
+  Uint32 decompressedSize;
+  std::memcpy(&decompressedSize, &content[0], sizeof(Uint32));
+  if (decompressedSize > 10'000'000) {
+    fmt::print(stderr,
+               fg(fmt::color::red),
+               "failed to load model file {}: decompressed size is too big "
+               "({}), is the file corrupt?\n",
+               filepath,
+               decompressedSize);
+    return {};
+  }
+  std::unique_ptr<char[]> decompressedStr =
+    std::make_unique<char[]>(decompressedSize);
+  if (LZ4_decompress_safe(&content[sizeof(Uint32)],
+                          decompressedStr.get(),
+                          static_cast<int>(content.size() - sizeof(Uint32)),
+                          decompressedSize) <= 0) {
+    fmt::print(stderr,
+               fg(fmt::color::red),
+               "failed to load model file {}: corrupt file\n",
+               filepath);
+    return {};
+  }
+
+  return LoadFromJSon(nlohmann::json::parse(decompressedStr.get()));
+}
+
+Model
+Model::LoadFromFileBinary(const std::filesystem::path& filepath)
+{
+  std::ifstream inputFile(filepath, std::ios::binary);
+  if (!inputFile.is_open()) {
+    fmt::print(
+      stderr, fg(fmt::color::red), "failed to open model file {}\n", filepath);
+    return {};
+  }
+  Uint8 version = FileVersion;
+  inputFile.read(reinterpret_cast<char*>(&version), sizeof(Uint8));
+  if (version > FileVersion) {
+    fmt::print(stderr,
+               fg(fmt::color::red),
+               "model file has unsupported version {} (current version is {})",
+               version,
+               FileVersion);
+    return {};
+  }
+
+  Model model;
+  Uint32 pathLength;
+  inputFile.read(reinterpret_cast<char*>(&pathLength), sizeof(Uint32));
+
+  std::string texturePath;
+  if (pathLength > 0) {
+    texturePath.resize(pathLength);
+    inputFile.read(reinterpret_cast<char*>(&texturePath[0]), pathLength);
+  }
+
+  std::shared_ptr<const SDLppTexture> texture;
+  if (!texturePath.empty())
+    texture = ResourceManager::Instance().GetTexture(texturePath);
+  Uint32 indexCount;
+  inputFile.read(reinterpret_cast<char*>(&indexCount), sizeof(Uint32));
+
+  std::vector<int> indices;
+  for (Uint32 i = 0; i < indexCount; ++i) {
+    Sint32 value;
+    inputFile.read(reinterpret_cast<char*>(&value), sizeof(Sint32));
+
+    indices.push_back(static_cast<int>(value));
+  }
+  Uint32 vertexCount;
+  inputFile.read(reinterpret_cast<char*>(&vertexCount), sizeof(Uint32));
+
+  std::vector<ModelVertex> vertices(vertexCount);
+  for (auto& vertex : vertices) {
+    inputFile.read(reinterpret_cast<char*>(&vertex.pos.x), sizeof(float));
+    inputFile.read(reinterpret_cast<char*>(&vertex.pos.y), sizeof(float));
+    inputFile.read(reinterpret_cast<char*>(&vertex.uv.x), sizeof(float));
+    inputFile.read(reinterpret_cast<char*>(&vertex.uv.y), sizeof(float));
+    inputFile.read(reinterpret_cast<char*>(&vertex.color.r), sizeof(float));
+    inputFile.read(reinterpret_cast<char*>(&vertex.color.g), sizeof(float));
+    inputFile.read(reinterpret_cast<char*>(&vertex.color.b), sizeof(float));
+    inputFile.read(reinterpret_cast<char*>(&vertex.color.a), sizeof(float));
+  }
+
+  return Model(std::move(texture), std::move(vertices), std::move(indices));
+}

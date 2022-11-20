@@ -1,37 +1,37 @@
 add_rules("mode.debug", "mode.release")
 
-add_requires("libsdl", "libsdl_image", "fmt", "entt", "nlohmann_json", "chipmunk2d", "openal-soft", "dr_wav")
-add_requires("imgui", {configs = {sdl2 = true}})
+add_requires("imgui", { configs = { sdl2 = true }})
+add_requires("libsdl", "libsdl_image", "fmt", "entt", "lz4", "nlohmann_json", "chipmunk2d", "openal-soft", "dr_wav")
 
 set_allowedarchs("windows|x64")
 set_warnings("allextra")
 
-set_languages("c++20")
-
 add_includedirs("include")
 set_rundir("bin")
 
+set_languages("c++20")
+
 if is_plat("windows") then
+    set_runtimes("MD")
     add_cxflags("/wd4251")
     add_cxflags("/wd4275")
 end
 
-target("A4Engine")
+target("Engine")
     set_kind("static")
-    add_headerfiles("include/*.h")
-    add_files("src/*.cc")
+    add_headerfiles("include/Engine/*.hh")
+    add_files("src/Engine/**.cc")
+    add_packages("imgui", "libsdl", "libsdl_image", "fmt", "entt", "lz4", "nlohmann_json", "chipmunk2d", "openal-soft", "dr_wav", { public = true })
     set_targetdir("lib")
-    add_packages("libsdl_image")
-    add_packages("libsdl", "fmt", "imgui", "entt", "nlohmann_json", "chipmunk2d", "openal-soft", "dr_wav", {public = true})
 
-target("A4Demo")
-    add_deps("A4Engine")
-    add_headerfiles("demo_include/*.h")
-    add_files("demo_src/*.cc")
+target("Game")
+    add_deps("Engine")
+    add_headerfiles("include/Game/**.hh")
+    add_files("src/Game/**.cc")
     set_targetdir("bin")
 
-target("A4Test")
-    add_deps("A4Engine")
-    add_headerfiles("test_include/*.h")
-    add_files("test_src/*.cc")
+target("Test")
+    add_deps("Engine")
+    add_headerfiles("include/Test/**.hh")
+    add_files("src/Test/**.cc")
     set_targetdir("bin")
