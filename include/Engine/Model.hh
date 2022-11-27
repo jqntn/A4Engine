@@ -10,8 +10,8 @@
 #include <nlohmann/json_fwd.hpp>
 #include <vector>
 
-class SDLppRenderer;
-class SDLppTexture;
+class Renderer;
+class Texture;
 class Transform;
 
 struct ModelVertex
@@ -25,14 +25,14 @@ class Model : public Renderable
 {
 public:
   Model() = default;
-  Model(std::shared_ptr<const SDLppTexture> texture,
+  Model(std::shared_ptr<const Texture> texture,
         std::vector<ModelVertex> vertices,
         std::vector<int> indices);
   Model(const Model&) = default;
   Model(Model&&) = default;
   ~Model() = default;
 
-  void Draw(SDLppRenderer& renderer, const Matrix3f& matrix) override;
+  void Draw(Renderer& renderer, const Matrix3f& matrix) override;
 
   const std::vector<ModelVertex>& GetVertices() const;
 
@@ -56,7 +56,7 @@ private:
   static Model LoadFromFileCompressed(const std::filesystem::path& filepath);
   static Model LoadFromFileBinary(const std::filesystem::path& filepath);
 
-  std::shared_ptr<const SDLppTexture> m_texture;
+  std::shared_ptr<const Texture> m_texture;
   std::vector<ModelVertex> m_vertices;
   std::vector<SDL_Vertex> m_sdlVertices;
   std::vector<int> m_indices;

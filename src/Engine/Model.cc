@@ -1,7 +1,7 @@
 #include <Engine/Model.hh>
+#include <Engine/Renderer.hh>
 #include <Engine/ResourceManager.hh>
-#include <Engine/SDLppRenderer.hh>
-#include <Engine/SDLppTexture.hh>
+#include <Engine/Texture.hh>
 #include <Engine/Transform.hh>
 #include <cassert>
 #include <fmt/color.h>
@@ -13,7 +13,7 @@
 
 constexpr unsigned int FileVersion = 1;
 
-Model::Model(std::shared_ptr<const SDLppTexture> texture,
+Model::Model(std::shared_ptr<const Texture> texture,
              std::vector<ModelVertex> vertices,
              std::vector<int> indices)
   : m_texture(std::move(texture))
@@ -34,7 +34,7 @@ Model::Model(std::shared_ptr<const SDLppTexture> texture,
 }
 
 void
-Model::Draw(SDLppRenderer& renderer, const Matrix3f& matrix)
+Model::Draw(Renderer& renderer, const Matrix3f& matrix)
 {
   assert(m_vertices.size() == m_sdlVertices.size());
   for (std::size_t i = 0; i < m_vertices.size(); ++i) {
@@ -162,7 +162,7 @@ Model::LoadFromJSon(const nlohmann::json& doc)
   }
 
   std::string texturePath = doc.value("texture", "");
-  std::shared_ptr<const SDLppTexture> texture;
+  std::shared_ptr<const Texture> texture;
   if (!texturePath.empty())
     texture = ResourceManager::Instance().GetTexture(texturePath);
   std::vector<int> indices;
@@ -378,7 +378,7 @@ Model::LoadFromFileBinary(const std::filesystem::path& filepath)
     inputFile.read(reinterpret_cast<char*>(&texturePath[0]), pathLength);
   }
 
-  std::shared_ptr<const SDLppTexture> texture;
+  std::shared_ptr<const Texture> texture;
   if (!texturePath.empty())
     texture = ResourceManager::Instance().GetTexture(texturePath);
   Uint32 indexCount;

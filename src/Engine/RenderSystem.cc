@@ -7,7 +7,7 @@
 #include <fmt/color.h>
 #include <fmt/core.h>
 
-RenderSystem::RenderSystem(SDLppRenderer& renderer, entt::registry& registry)
+RenderSystem::RenderSystem(Renderer& renderer, entt::registry& registry)
   : m_renderer(renderer)
   , m_registry(registry)
 {

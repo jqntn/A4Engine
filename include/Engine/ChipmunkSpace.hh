@@ -4,7 +4,7 @@
 #include <Engine/Vector2.hh>
 
 struct cpSpace;
-class SDLppRenderer;
+class Renderer;
 
 class ChipmunkSpace
 {
@@ -14,8 +14,7 @@ public:
   ChipmunkSpace(ChipmunkSpace&& space) noexcept;
   ~ChipmunkSpace();
 
-  void DebugDraw(SDLppRenderer& renderer,
-                 const Matrix3f& cameraInverseTransform);
+  void DebugDraw(Renderer& renderer, const Matrix3f& cameraInverseTransform);
 
   cpSpace* GetHandle() const;
 

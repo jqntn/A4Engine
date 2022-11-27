@@ -1,15 +1,14 @@
-#include <Engine/SDLppRenderer.hh>
-#include <Engine/SDLppTexture.hh>
+#include <Engine/Renderer.hh>
 #include <Engine/Sprite.hh>
+#include <Engine/Texture.hh>
 #include <Engine/Transform.hh>
 
-Sprite::Sprite(std::shared_ptr<const SDLppTexture> texture)
+Sprite::Sprite(std::shared_ptr<const Texture> texture)
   : Sprite(std::move(texture), texture->GetRect())
 {
 }
 
-Sprite::Sprite(std::shared_ptr<const SDLppTexture> texture,
-               const SDL_Rect& rect)
+Sprite::Sprite(std::shared_ptr<const Texture> texture, const SDL_Rect& rect)
   : m_texture(std::move(texture))
   , m_rect(rect)
   , m_origin(0.f, 0.f)
@@ -19,7 +18,7 @@ Sprite::Sprite(std::shared_ptr<const SDLppTexture> texture,
 }
 
 void
-Sprite::Draw(SDLppRenderer& renderer, const Matrix3f& matrix)
+Sprite::Draw(Renderer& renderer, const Matrix3f& matrix)
 {
   SDL_Rect texRect = m_texture->GetRect();
 

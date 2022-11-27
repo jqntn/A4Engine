@@ -2,8 +2,8 @@
 
 #include <Engine/Matrix3.hh>
 
-class SDLppRenderer;
-class SDLppTexture;
+class Renderer;
+class Texture;
 class Transform;
 
 class Renderable
@@ -11,5 +11,5 @@ class Renderable
 public:
   virtual ~Renderable() = default;
 
-  virtual void Draw(SDLppRenderer& renderer, const Matrix3f& matrix) = 0;
+  virtual void Draw(Renderer& renderer, const Matrix3f& matrix) = 0;
 };

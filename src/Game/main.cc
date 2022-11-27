@@ -7,22 +7,24 @@
 #include <Engine/ChipmunkSpace.hh>
 #include <Engine/CollisionShape.hh>
 #include <Engine/GraphicsComponent.hh>
+#include <Engine/ImGuiCC.hh>
 #include <Engine/InputManager.hh>
 #include <Engine/Model.hh>
+#include <Engine/OpenALCC.hh>
 #include <Engine/PhysicsSystem.hh>
 #include <Engine/RenderSystem.hh>
+#include <Engine/Renderer.hh>
 #include <Engine/ResourceManager.hh>
 #include <Engine/RigidBodyComponent.hh>
-#include <Engine/SDLpp.hh>
-#include <Engine/SDLppImGui.hh>
-#include <Engine/SDLppRenderer.hh>
-#include <Engine/SDLppTexture.hh>
-#include <Engine/SDLppWindow.hh>
+#include <Engine/SDLCC.hh>
+#include <Engine/Sound.hh>
 #include <Engine/Sprite.hh>
 #include <Engine/SpritesheetComponent.hh>
+#include <Engine/Texture.hh>
 #include <Engine/Transform.hh>
 #include <Engine/VelocityComponent.hh>
 #include <Engine/VelocitySystem.hh>
+#include <Engine/Window.hh>
 #include <SDL.h>
 #include <chipmunk/chipmunk.h>
 #include <entt/entt.hpp>
@@ -107,15 +109,17 @@ main()
 {
   SetProcessDPIAware();
 
-  SDLpp sdl;
+  SDLCC sdl;
 
-  SDLppWindow window("A4Engine", 1280, 720);
-  SDLppRenderer renderer(window, "direct3d11", SDL_RENDERER_PRESENTVSYNC);
+  OpenALCC openAL;
+
+  Window window("A4Engine", 1280, 720);
+  Renderer renderer(window, "direct3d11", SDL_RENDERER_PRESENTVSYNC);
 
   ResourceManager resourceManager(renderer);
   InputManager inputManager;
 
-  SDLppImGui imgui(window, renderer);
+  ImGuiCC imgui(window, renderer);
   ImGui::SetCurrentContext(imgui.GetContext());
   InputManager::Instance().BindKeyPressed(SDLK_q, "MoveLeft");
   InputManager::Instance().BindKeyPressed(SDLK_d, "MoveRight");
@@ -188,7 +192,7 @@ main()
     lastUpdate = now;
 
     SDL_Event event;
-    while (SDLpp::PollEvent(&event)) {
+    while (SDLCC::PollEvent(&event)) {
       if (event.type == SDL_QUIT)
         isOpen = false;
 

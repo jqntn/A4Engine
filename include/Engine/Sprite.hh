@@ -5,20 +5,20 @@
 #include <SDL.h>
 #include <memory>
 
-class SDLppRenderer;
-class SDLppTexture;
+class Renderer;
+class Texture;
 class Transform;
 
 class Sprite : public Renderable
 {
 public:
-  Sprite(std::shared_ptr<const SDLppTexture> texture);
-  Sprite(std::shared_ptr<const SDLppTexture> texture, const SDL_Rect& rect);
+  Sprite(std::shared_ptr<const Texture> texture);
+  Sprite(std::shared_ptr<const Texture> texture, const SDL_Rect& rect);
   Sprite(const Sprite&) = default;
   Sprite(Sprite&&) = default;
   ~Sprite() = default;
 
-  void Draw(SDLppRenderer& renderer, const Matrix3f& matrix) override;
+  void Draw(Renderer& renderer, const Matrix3f& matrix) override;
 
   int GetHeight() const;
   const Vector2f& GetOrigin() const;
@@ -33,7 +33,7 @@ public:
   Sprite& operator=(Sprite&&) = default;
 
 private:
-  std::shared_ptr<const SDLppTexture> m_texture;
+  std::shared_ptr<const Texture> m_texture;
   SDL_Rect m_rect;
   Vector2f m_origin;
   int m_width;

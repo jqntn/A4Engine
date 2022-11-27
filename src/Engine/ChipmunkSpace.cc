@@ -1,5 +1,5 @@
 #include <Engine/ChipmunkSpace.hh>
-#include <Engine/SDLppRenderer.hh>
+#include <Engine/Renderer.hh>
 #include <SDL.h>
 #include <algorithm>
 #include <chipmunk/chipmunk.h>
@@ -24,12 +24,12 @@ ChipmunkSpace::~ChipmunkSpace()
 }
 
 void
-ChipmunkSpace::DebugDraw(SDLppRenderer& renderer,
+ChipmunkSpace::DebugDraw(Renderer& renderer,
                          const Matrix3f& cameraInverseTransform)
 {
   struct DrawData
   {
-    SDLppRenderer& renderer;
+    Renderer& renderer;
     const Matrix3f& viewMatrix;
   };
 
