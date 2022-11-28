@@ -4,6 +4,7 @@
 
 #include <Engine/InputManager.hh>
 #include <Engine/ResourceManager.hh>
+#include <Engine/RigidBodyComponent.hh>
 #include <Engine/Transform.hh>
 
 #include <entt/entt.hpp>
@@ -32,11 +33,6 @@ Cell::Cell(entt::registry& registry,
   alSourcef(_tacobell->GetSource(), AL_GAIN, .1f);
 }
 
-Cell::~Cell()
-{
-  _registry.destroy(_cell);
-}
-
 void
 Cell::Update(float deltaTime)
 {
@@ -53,6 +49,19 @@ Cell::Update(float deltaTime)
     _hoveredCell = this;
   } else
     _isHovered = false;
+
+  if (_needToExplode) {
+    _timeToExplode -= deltaTime;
+    if (_timeToExplode < 0) {
+      for (const auto& cell : Minesweeper::_cells) {
+        shape = std::make_shared<CircleShape>(CELL_SIZE * 3);
+        auto& rb = _registry.emplace<RigidBodyComponent>(cell->_cell, 1);
+        rb.AddShape(std::move(shape));
+        rb.TeleportTo(cell->_cellTra.GetPosition());
+        cell->_needToExplode = false;
+      }
+    }
+  }
 }
 
 void
@@ -68,8 +77,14 @@ Cell::Unveil()
 
   SetSprite(_mainSpr);
 
-  if (_isBomb)
+  if (_isBomb) {
     _vineboom->Play();
+
+    Minesweeper::_canClick = false;
+
+    for (const auto& cell : Minesweeper::_cells)
+      cell->_needToExplode = true;
+  }
 
   if (_isEmpty)
     for (const auto& cell : GetAdjacentCells())

@@ -6,6 +6,8 @@
 #include <Engine/ResourceManager.hh>
 #include <Engine/Transform.hh>
 
+#include <Engine/CollisionShape.hh>
+#include <Engine/RigidBodyComponent.hh>
 #include <entt/entt.hpp>
 #include <imgui.h>
 
@@ -32,7 +34,7 @@ Minesweeper::Start()
                                                   "RightClick");
 
   InputManager::Instance().OnAction("LeftClick", [&](bool isDown) {
-    if (isDown) {
+    if (isDown && _canClick) {
       if (!_isPopulated) {
         if (Cell::_hoveredCell)
           if (Cell::_hoveredCell->_isHovered) {
@@ -50,7 +52,7 @@ Minesweeper::Start()
     }
   });
   InputManager::Instance().OnAction("RightClick", [&](bool isDown) {
-    if (isDown)
+    if (isDown && _canClick)
       if (Cell::_hoveredCell)
         if (Cell::_hoveredCell->_isHovered)
           Cell::_hoveredCell->Flag();
@@ -155,6 +157,8 @@ Minesweeper::GenGrid()
   }
 
   _flagsLeft = 0;
+
+  _canClick = true;
 }
 
 void
@@ -230,6 +234,9 @@ Minesweeper::PopulateGrid()
 void
 Minesweeper::ClearGrid()
 {
+  for (const auto& cell : _cells)
+    cell->_registry.destroy(cell->_cell);
+
   _cells.clear();
 }
 

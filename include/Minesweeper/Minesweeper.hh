@@ -15,13 +15,14 @@ class Minesweeper
 public:
   Minesweeper(entt::registry& registry);
 
-  virtual ~Minesweeper() = default;
+  ~Minesweeper() = default;
 
   void Start();
   void Update(float deltaTime);
   void Render(float deltaTime);
 
   inline static int _flagsLeft{};
+  inline static bool _canClick{};
 
   inline static std::vector<std::shared_ptr<Cell>> _cells;
 

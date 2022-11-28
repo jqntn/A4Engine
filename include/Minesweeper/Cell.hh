@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Engine/CollisionShape.hh>
 #include <Engine/GraphicsComponent.hh>
 #include <Engine/Sound.hh>
 #include <Engine/Sprite.hh>
@@ -16,7 +17,7 @@ struct Cell
        const std::shared_ptr<Sprite>& fgSpr,
        const std::shared_ptr<Sprite>& flagSpr,
        const Vector2f& pos);
-  virtual ~Cell();
+  ~Cell() = default;
 
   void Update(float deltaTime);
 
@@ -32,6 +33,7 @@ struct Cell
   inline static Cell* _hoveredCell;
 
   bool _isReserved{};
+  bool _needToExplode{};
 
   bool _isEmpty{};
   bool _isBomb{};
@@ -42,6 +44,10 @@ struct Cell
 
   int _index{};
   int _bombCount{};
+
+  float _timeToExplode = .3f;
+
+  std::shared_ptr<CircleShape> shape;
 
   Vector2i _posGrid{};
 
